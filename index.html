@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Shortener</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result {
+            display: none;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .result.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .short-url {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .short-url input {
+            flex: 1;
+            background: white;
+        }
+
+        .copy-btn {
+            padding: 10px 20px;
+            font-size: 14px;
+        }
+
+        .error {
+            color: #e74c3c;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 URL Shortener</h1>
+        <p class="subtitle">Shorten your long URLs instantly</p>
+
+        <div class="input-group">
+            <input 
+                type="url" 
+                id="urlInput" 
+                placeholder="Enter your long URL here..."
+                required
+            >
+            <button id="shortenBtn" onclick="shortenUrl()">Shorten</button>
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="result" id="result">
+            <h3>Your shortened URL:</h3>
+            <div class="short-url">
+                <input 
+                    type="text" 
+                    id="shortUrlInput" 
+                    readonly
+                >
+                <button class="copy-btn" onclick="copyUrl()">Copy</button>
+            </div>
+        </div>
+
+        <div class="footer">
+            Powered by Flask + MongoDB
+        </div>
+    </div>
+
+    <script>
+        // IMPORTANT: Replace this with your actual Render backend URL
+        const API_URL = 'https://your-app-name.onrender.com';
+
+        async function shortenUrl() {
+            const urlInput = document.getElementById('urlInput');
+            const shortenBtn = document.getElementById('shortenBtn');
+            const error = document.getElementById('error');
+            const result = document.getElementById('result');
+            const url = urlInput.value.trim();
+
+            // Reset states
+            error.classList.remove('show');
+            result.classList.remove('show');
+
+            // Validate input
+            if (!url) {
+                showError('Please enter a URL');
+                return;
+            }
+
+            // Validate URL format
+            try {
+                new URL(url);
+            } catch {
+                showError('Please enter a valid URL (including http:// or https://)');
+                return;
+            }
+
+            // Show loading
+            shortenBtn.disabled = true;
+            shortenBtn.innerHTML = '<span class="loading"></span>';
+
+            try {
+                const response = await fetch(`${API_URL}/api/shorten`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to shorten URL');
+                }
+
+                // Show result
+                document.getElementById('shortUrlInput').value = data.shortUrl;
+                result.classList.add('show');
+
+            } catch (err) {
+                showError(err.message || 'Something went wrong. Please try again.');
+            } finally {
+                shortenBtn.disabled = false;
+                shortenBtn.textContent = 'Shorten';
+            }
+        }
+
+        function showError(message) {
+            const error = document.getElementById('error');
+            error.textContent = message;
+            error.classList.add('show');
+        }
+
+        function copyUrl() {
+            const shortUrlInput = document.getElementById('shortUrlInput');
+            shortUrlInput.select();
+            document.execCommand('copy');
+            
+            const copyBtn = event.target;
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+            }, 2000);
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('urlInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                shortenUrl();
+            }
+        });
+    </script>
+</body>
+</html>
